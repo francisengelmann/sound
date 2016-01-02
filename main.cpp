@@ -12,6 +12,9 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+// FFTW includes
+#include <fftw3.h>
+
 /**
  * @brief get_audio_devices
  * @return std::vector containing name as std::string of input devices
@@ -38,17 +41,72 @@ bool is_enumerate_supported() {
   return !(enumeration == AL_FALSE);
 }
 
-void plot_samples(ALshort* buffer, int nsamples=22050) {
+/*void plot_spectrum(double* buffer[2], int nsamples) {
 
+  // Compute maximum amplitude
+  bool scaling = true;
   int max = 0;
-  for (int i=0; i<nsamples; i++) if (max < buffer[i]) max = buffer[i];
+  if (scaling) {
+    for (int i=0; i<nsamples; i++)
+      if (max < buffer[i][0]) max = buffer[i][0];
+    max*=2.0;
+  } else {
+    max = 65536/2;
+  }
 
+  // Plot points
+  cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
+  std::vector<cv::Point> contour_real, contour_comp;
+  contour_real.resize(nsamples+1);
+  contour_comp.resize(nsamples+1);
+  for (int i=0; i<nsamples; i++) {
+    int it = (i+nsamples/2)%nsamples;
+    int v_real = (int)((double)buffer[it][0]*600.0f/max)+300;
+    int v_comp = (int)((double)buffer[it][0]*600.0f/max)+300;
+    contour_real.push_back( cv::Point(i, v_comp) );
+    contour_comp.push_back( cv::Point(i, v_real) );
+  }
+
+  const cv::Point *pts_real = (const cv::Point*) cv::Mat(contour_real).data;
+  const cv::Point *pts_comp = (const cv::Point*) cv::Mat(contour_comp).data;
+  int npts_real = cv::Mat(contour_real).rows;
+  int npts_comp = cv::Mat(contour_comp).rows;
+
+  cv::polylines(image, &pts_real, &npts_real, 1,
+              false, 			// draw closed contour (i.e. joint end to start)
+              cv::Scalar(0,255,0),// colour RGB ordering (here = green)
+              1, 		        // line thickness
+              CV_AA, 0);
+  cv::polylines(image, &pts_comp, &npts_comp, 1,
+              false, 			// draw closed contour (i.e. joint end to start)
+              cv::Scalar(0,255,0),// colour RGB ordering (here = green)
+              1, 		        // line thickness
+              CV_AA, 0);
+
+  cv::imshow("spectrum", image);
+  cv::waitKey(1);
+}*/
+
+void plot_samples(short* buffer, int nsamples) {
+
+  // Compute maximum amplitude
+  bool scaling = false;
+  int max = 0;
+  if (scaling) {
+    for (int i=0; i<nsamples; i++)
+      if (max < buffer[i]) max = buffer[i];
+    max*=2.0;
+  } else {
+    max = 65536/2;
+  }
+
+  // Plot points
   cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
   std::vector<cv::Point> contour;
   contour.resize(nsamples+1);
   for (int i=0; i<nsamples; i++) {
     //int v = (int)((double)buffer[i]*600.0f/65536.0)+300;
-    int v = (int)((double)buffer[i]*600.0f/max/2)+300;
+    int v = (int)((double)buffer[i]*600.0f/max)+300;
     contour.push_back( cv::Point(i, v) );
   }
 
@@ -61,8 +119,8 @@ void plot_samples(ALshort* buffer, int nsamples=22050) {
               1, 		        // line thickness
               CV_AA, 0);
 
-  cv::imshow("plot", image);
-  cv::waitKey(10);
+  cv::imshow("spectrum", image);
+  cv::waitKey(1);
 }
 
 int main(int argc, char ** argv) {
@@ -86,6 +144,14 @@ int main(int argc, char ** argv) {
   ALCdevice *device = alcCaptureOpenDevice(deviceName, frequency, format, buffer_size);
   if (alGetError() != AL_NO_ERROR) return 0;
 
+  // Set FFT
+  int N = buffer_size;
+  fftw_complex *in, *out;
+  fftw_plan p;
+  in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
+  out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
+  p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+
   // Start capturing
   alcCaptureStart(device);
 
@@ -102,14 +168,74 @@ int main(int argc, char ** argv) {
     ALshort buffer[1024];
     alcCaptureSamples(device, (ALCvoid *)buffer, available_samples);
 
+    // Put buffer into format of fft
+    for (int i=0; i<1024; i++) {
+      in[i][0] = (double)buffer[i]; // Real part
+      in[i][1] = (double)0.0; // Imaginary part
+    }
+
+    // Perform the FFT
+    fftw_execute(p); /* repeat as needed */ // exactly, so the above stuff should only be executed once!!
+
     // Plot the buffer
-    plot_samples(&buffer[0], 1024);
+    plot_samples(buffer, 1024);
+
+    // PLOT SPECTRUM
+    {
+      // Compute maximum amplitude
+      int nsamples = 1024;
+      bool scaling = false;
+      int max = 0;
+      if (scaling) {
+        for (int i=0; i<nsamples; i++)
+          if (max < out[i][0]) max = out[i][0];
+        max*=2.0;
+      } else {
+        max = 65536/2;
+      }
+
+      // Plot points
+      cv::Mat image_real(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
+      cv::Mat image_comp(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
+      std::vector<cv::Point> contour_real, contour_comp;
+      contour_real.resize(nsamples+1);
+      contour_comp.resize(nsamples+1);
+      for (int i=0; i<nsamples; i++) {
+        int it = (i+nsamples/2)%nsamples;
+        int v_real = (int)((double)out[it][0]*600.0f/max)+300;
+        int v_comp = (int)((double)out[it][1]*600.0f/max)+300;
+        contour_real.push_back( cv::Point(i, v_comp) );
+        contour_comp.push_back( cv::Point(i, v_real) );
+      }
+
+      const cv::Point *pts_real = (const cv::Point*) cv::Mat(contour_real).data;
+      const cv::Point *pts_comp = (const cv::Point*) cv::Mat(contour_comp).data;
+      int npts_real = cv::Mat(contour_real).rows;
+      int npts_comp = cv::Mat(contour_comp).rows;
+
+      cv::polylines(image_real, &pts_real, &npts_real, 1,
+                  false, 			// draw closed contour (i.e. joint end to start)
+                  cv::Scalar(0,255,0),// colour RGB ordering (here = green)
+                  1, 		        // line thickness
+                  CV_AA, 0);
+      cv::polylines(image_comp, &pts_comp, &npts_comp, 1,
+                  false, 			// draw closed contour (i.e. joint end to start)
+                  cv::Scalar(255,0,0),// colour RGB ordering (here = green)
+                  1, 		        // line thickness
+                  CV_AA, 0);
+
+      cv::imshow("spectrum_real", image_real);
+      cv::imshow("spectrum_comp", image_comp);
+      cv::waitKey(1);
+    }
   }
+
+  fftw_destroy_plan(p);
+  fftw_free(in); fftw_free(out);
 
   alcCaptureStop(device);
   alcCaptureCloseDevice(device);
 }
-
 
 /*int main2(int argC,char* argV[])
 {
