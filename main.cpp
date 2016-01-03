@@ -104,7 +104,7 @@ void plot_samples(short* buffer, int nsamples) {
   cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
   std::vector<cv::Point> contour;
   contour.resize(nsamples+1);
-  for (int i=0; i<nsamples; i++) {
+  for (int i=1; i<nsamples; i++) {
     //int v = (int)((double)buffer[i]*600.0f/65536.0)+300;
     int v = (int)((double)buffer[i]*600.0f/max)+300;
     contour.push_back( cv::Point(i, v) );
@@ -116,7 +116,7 @@ void plot_samples(short* buffer, int nsamples) {
   cv::polylines(image, &pts, &npts, 1,
               false, 			// draw closed contour (i.e. joint end to start)
               cv::Scalar(0,255,0),// colour RGB ordering (here = green)
-              1, 		        // line thickness
+              2, 		        // line thickness
               CV_AA, 0);
 
   cv::imshow("spectrum", image);
@@ -137,7 +137,7 @@ int main(int argc, char ** argv) {
   alGetError();
 
   // Open listening device
-  ALCuint frequency = 44100*0.5;
+  ALCuint frequency = 44100;
   ALCenum format = AL_FORMAT_MONO16;
   ALCsizei buffer_size = 1024; // Anzahl der Sampleframes
   ALCchar* deviceName = NULL;
@@ -178,7 +178,7 @@ int main(int argc, char ** argv) {
     fftw_execute(p); /* repeat as needed */ // exactly, so the above stuff should only be executed once!!
 
     // Plot the buffer
-    plot_samples(buffer, 1024);
+    //plot_samples(buffer, 1024);
 
     // PLOT SPECTRUM
     {
@@ -186,36 +186,50 @@ int main(int argc, char ** argv) {
       int nsamples = 1024;
       bool scaling = false;
       int max = 0;
-      if (scaling) {
-        for (int i=0; i<nsamples; i++){
-          double v = std::sqrt(out[i][0]*out[i][0] + out[i][1]*out[i][1]);
-          if (max < v) max = v;
+      int max_freq;
+      double v; // max freq value
+      //if (scaling) {
+        for (int i=0; i<nsamples/2; i++){
+          v = std::sqrt(out[i][0]*out[i][0] + out[i][1]*out[i][1]);
+          if (max < v) {
+            max = v;
+            max_freq = i;
+          }
         }
-        max*=1.1;
-      } else {
-        max = 65536;
-      }
+        //max_freq=max;
+      //} else {
+        max = 65536*32;
+      //}
+
+      double cut_off_factor = 4;
 
       // Plot points
-      cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
+      cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(255,255,255));
       std::vector<cv::Point> contour;
       contour.resize(nsamples+1);
-      for (int i=0; i<nsamples/2; i++) {
+      for (int i=1; i<nsamples/cut_off_factor; i++) {
         //int it = (i+nsamples/2)%nsamples;
         int it = i;
         double mag = std::sqrt(out[it][0]*out[it][0] + out[it][1]*out[it][1]);
         double v = (int)(mag*-590.0f/max)+590;
-        contour.push_back( cv::Point(2*i, v) );
+        contour.push_back( cv::Point(cut_off_factor*i, v) );
       }
 
       const cv::Point *pts = (const cv::Point*) cv::Mat(contour).data;
       int npts = cv::Mat(contour).rows;
 
+      // Draw max peak line
+      if (v>17) {
+        cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(0,0,255),2);
+      }
+
+      // Draw spectrum
       cv::polylines(image, &pts, &npts, 1,
-                  false, 			// draw closed contour (i.e. joint end to start)
-                  cv::Scalar(255,255,255),// colour RGB ordering (here = green)
-                  1, 		        // line thickness
-                  CV_AA, 0);
+                  false,             // Draw closed contour (i.e. joint end to start)
+                  cv::Scalar(0,0,0), // Colour RGB ordering (here = green)
+                  1,                 // Line thickness
+                  0, 0);
+
 
       cv::imshow("spectrum_", image);
       cv::waitKey(5);
