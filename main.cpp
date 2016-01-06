@@ -104,6 +104,7 @@ void plot_samples(short* buffer, int nsamples) {
   cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(0,0,0));
   std::vector<cv::Point> contour;
   contour.resize(nsamples+1);
+  contour.clear();
   for (int i=1; i<nsamples; i++) {
     //int v = (int)((double)buffer[i]*600.0f/65536.0)+300;
     int v = (int)((double)buffer[i]*600.0f/max)+300;
@@ -137,7 +138,7 @@ int main(int argc, char ** argv) {
   alGetError();
 
   // Open listening device
-  ALCuint frequency = 44100;
+  ALCuint frequency = 44100/2;
   ALCenum format = AL_FORMAT_MONO16;
   ALCsizei buffer_size = 1024; // Anzahl der Sampleframes
   ALCchar* deviceName = NULL;
@@ -150,26 +151,35 @@ int main(int argc, char ** argv) {
   fftw_plan p;
   in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
   out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
-  p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+  p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_MEASURE);
 
   // Start capturing
   alcCaptureStart(device);
 
-  while (true) {
+  int nsamples = buffer_size;
 
+  int back = 3;
+  double waterfall[back][nsamples/2];
+  double average[nsamples/2];
+
+  int j = 0;
+  while (true) {
+    j++;
+    j=j%back;
     // Check how many samples are available
     ALCenum param = ALC_CAPTURE_SAMPLES; // Gibt die Anzahl der verfügbaren Aufnahmesamples zurück
     ALCsizei size = (ALCsizei)sizeof(ALint); // Größe des bereitgestellten Puffers, hier ein int
     ALint available_samples; //hier wird der wert zureuckgeliefert
+    //std::cout << available_samples << std::endl;
     alcGetIntegerv(device, param, size, &available_samples);
     if (alGetError() != AL_NO_ERROR) return 0;
 
     // Put the available samples into the buffer
-    ALshort buffer[1024];
+    ALshort buffer[buffer_size];
     alcCaptureSamples(device, (ALCvoid *)buffer, available_samples);
 
     // Put buffer into format of fft
-    for (int i=0; i<1024; i++) {
+    for (int i=0; i<buffer_size; i++) {
       in[i][0] = (double)buffer[i]; // Real part
       in[i][1] = (double)0.0; // Imaginary part
     }
@@ -178,18 +188,40 @@ int main(int argc, char ** argv) {
     fftw_execute(p); /* repeat as needed */ // exactly, so the above stuff should only be executed once!!
 
     // Plot the buffer
-    //plot_samples(buffer, 1024);
+    plot_samples(buffer, 1024);
+
+
 
     // PLOT SPECTRUM
     {
-      // Compute maximum amplitude
-      int nsamples = 1024;
+
+      double v; // max freq value
+      for (int i=0; i<nsamples/2; i++){
+        v = std::sqrt(out[i][0]*out[i][0] + out[i][1]*out[i][1]);
+        waterfall[j][i] = v;
+      }
+
+
       bool scaling = false;
       int max = 0;
       int max_freq;
-      double v; // max freq value
+      for (int i=0; i<nsamples/2; i++){
+        double avg = 0;
+        for (int k=0; k<back; k++) {
+          avg += waterfall[k][i];
+        }
+        average[i] = avg/back;
+        if (max < average[i]) {
+          max = average[i];
+          max_freq = i;
+        }
+      }
+      max = 65536*32;
+
+      // Compute maximum amplitude
+
       //if (scaling) {
-        for (int i=0; i<nsamples/2; i++){
+      /*  for (int i=0; i<nsamples/2; i++){
           v = std::sqrt(out[i][0]*out[i][0] + out[i][1]*out[i][1]);
           if (max < v) {
             max = v;
@@ -198,20 +230,24 @@ int main(int argc, char ** argv) {
         }
         //max_freq=max;
       //} else {
-        max = 65536*32;
-      //}
+      //}*/
 
       double cut_off_factor = 4;
 
       // Plot points
-      cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(255,255,255));
+      cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(20,30,40));
+
+      for (int i=0; i<buffer_size; i+=40) cv::line(image, cv::Point(i,0), cv::Point(i,600), cv::Scalar(100, 100, 100), 1);
+      for (int i=0; i<600; i+=40) cv::line(image, cv::Point(0,i), cv::Point(buffer_size,i), cv::Scalar(100, 100, 100), 1);
+
       std::vector<cv::Point> contour;
       contour.resize(nsamples+1);
-      for (int i=1; i<nsamples/cut_off_factor; i++) {
+      contour.clear();
+      for (int i=0; i<nsamples/cut_off_factor; i++) {
         //int it = (i+nsamples/2)%nsamples;
         int it = i;
-        double mag = std::sqrt(out[it][0]*out[it][0] + out[it][1]*out[it][1]);
-        double v = (int)(mag*-590.0f/max)+590;
+        double mag = average[i];
+        double v = (int)(mag*-590.0f/max)+598;
         contour.push_back( cv::Point(cut_off_factor*i, v) );
       }
 
@@ -220,18 +256,20 @@ int main(int argc, char ** argv) {
 
       // Draw max peak line
       if (v>17) {
-        cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(0,0,255),2);
+        cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(255,255,255),2);
+        cv::putText(image, std::to_string((max_freq*frequency)/1000.0), cv::Point(50,50), 5, 2, cv::Scalar(255,255,255),2);
       }
 
       // Draw spectrum
       cv::polylines(image, &pts, &npts, 1,
                   false,             // Draw closed contour (i.e. joint end to start)
-                  cv::Scalar(0,0,0), // Colour RGB ordering (here = green)
-                  1,                 // Line thickness
+                  cv::Scalar(255,100,50), // Colour RGB ordering (here = green)
+                  2,                 // Line thickness
                   0, 0);
 
+      // Put text
 
-      cv::imshow("spectrum_", image);
+      cv::imshow("Spectrum", image);
       cv::waitKey(5);
     }
   }
