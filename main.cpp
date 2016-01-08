@@ -138,7 +138,7 @@ int main(int argc, char ** argv) {
   alGetError();
 
   // Open listening device
-  ALCuint frequency = 44100/2;
+  ALCuint frequency = 44100/4;
   ALCenum format = AL_FORMAT_MONO16;
   ALCsizei buffer_size = 1024; // Anzahl der Sampleframes
   ALCchar* deviceName = NULL;
@@ -151,7 +151,7 @@ int main(int argc, char ** argv) {
   fftw_plan p;
   in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
   out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
-  p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_MEASURE);
+  p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE_PATIENT);
 
   // Start capturing
   alcCaptureStart(device);
@@ -188,9 +188,7 @@ int main(int argc, char ** argv) {
     fftw_execute(p); /* repeat as needed */ // exactly, so the above stuff should only be executed once!!
 
     // Plot the buffer
-    plot_samples(buffer, 1024);
-
-
+    plot_samples(buffer, buffer_size);
 
     // PLOT SPECTRUM
     {
@@ -257,7 +255,7 @@ int main(int argc, char ** argv) {
       // Draw max peak line
       if (v>17) {
         cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(255,255,255),2);
-        cv::putText(image, std::to_string((max_freq*frequency)/1000.0), cv::Point(50,50), 5, 2, cv::Scalar(255,255,255),2);
+        cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
       }
 
       // Draw spectrum
