@@ -192,7 +192,6 @@ int main(int argc, char ** argv) {
 
     // PLOT SPECTRUM
     {
-
       double v; // max freq value
       for (int i=0; i<nsamples/2; i++){
         v = std::sqrt(out[i][0]*out[i][0] + out[i][1]*out[i][1]);
@@ -229,7 +228,7 @@ int main(int argc, char ** argv) {
       //} else {
       //}*/
 
-      double cut_off_factor = 4;//
+      double cut_off_factor = 4;
 
       // Plot points
       cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(20,30,40));
@@ -273,7 +272,7 @@ int main(int argc, char ** argv) {
       // Draw max peak line with frequency
       /*if (v>17) {
         cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(255,255,255),2);
-        cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+" Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+        cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+"Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
       }*/
 
       std::cout << "---------------" << std::endl;
@@ -288,8 +287,7 @@ int main(int argc, char ** argv) {
       if (maximums.size() > 0)
       std::cout << i_min << " " << maximums.at(i_min) << std::endl;
 
-      cv::putText(image, std::to_string(fundamental)+" Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
-
+      cv::putText(image, std::to_string(fundamental)+"Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
 
       /*if (maximums.size() > 1) {
         double fundamental = 0.0;
@@ -364,7 +362,6 @@ int main(int argc, char ** argv) {
     std::cout << helloBuffer[ii] << std::endl;
     bufferQueue.push_back(helloBuffer[ii]);
   }
-
 
   alGenSources (1, &helloSource[0]); // Create a sound source
   errorCode = alGetError();
