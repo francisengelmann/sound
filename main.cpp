@@ -156,21 +156,21 @@ int main(int argc, char ** argv) {
   // Start capturing
   alcCaptureStart(device);
 
-  int nsamples = buffer_size;
-
-  int back = 3;
-  double waterfall[back][nsamples/2];
+  int nsamples = buffer_size; // number of samples to take in one go, same as size of buffer
+  int back = 3; // number of buffers to use for computing average
+  double waterfall[back][nsamples/2]; // buffer for fourrier output, only have the size, first have of spectrum is symetric to second part
   double average[nsamples/2];
 
   int j = 0;
   while (true) {
     j++;
     j=j%back;
+
     // Check how many samples are available
     ALCenum param = ALC_CAPTURE_SAMPLES; // Gibt die Anzahl der verfügbaren Aufnahmesamples zurück
     ALCsizei size = (ALCsizei)sizeof(ALint); // Größe des bereitgestellten Puffers, hier ein int
     ALint available_samples; //hier wird der wert zureuckgeliefert
-    //std::cout << available_samples << std::endl;
+
     alcGetIntegerv(device, param, size, &available_samples);
     if (alGetError() != AL_NO_ERROR) return 0;
 
@@ -198,7 +198,6 @@ int main(int argc, char ** argv) {
         v = std::sqrt(out[i][0]*out[i][0] + out[i][1]*out[i][1]);
         waterfall[j][i] = v;
       }
-
 
       bool scaling = false;
       int max = 0;
@@ -230,7 +229,7 @@ int main(int argc, char ** argv) {
       //} else {
       //}*/
 
-      double cut_off_factor = 4;
+      double cut_off_factor = 4;//
 
       // Plot points
       cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(20,30,40));
@@ -241,34 +240,94 @@ int main(int argc, char ** argv) {
       std::vector<cv::Point> contour;
       contour.resize(nsamples+1);
       contour.clear();
+
+      std::vector<int> maximums;
+      maximums.clear();
+
+      std::vector<cv::Point> contour_deriv;
+      contour_deriv.resize(nsamples+1);
+      contour_deriv.clear();
+      contour_deriv.push_back(cv::Point(0,300));
       for (int i=0; i<nsamples/cut_off_factor; i++) {
-        //int it = (i+nsamples/2)%nsamples;
         int it = i;
         double mag = average[i];
-        double v = (int)(mag*-590.0f/max)+598;
-        contour.push_back( cv::Point(cut_off_factor*i, v) );
+        double pos_y = (int)(mag*-598.0f/max)+598;
+        contour.push_back( cv::Point(cut_off_factor*i, pos_y) );
+        if (i>1) {
+
+          double deriv_curr = average[i] - average[i-1];
+          double deriv_prev = average[i-1] - average[i-2];
+
+          if (std::signbit(deriv_curr)==1 && std::signbit(deriv_prev)==0 && deriv_prev - deriv_curr > 40000) {
+            maximums.push_back(i-1);
+            //std::cout << average[i] << " " << average[i-1] << "; \t";
+            //std::cout << std::signbit(deriv_prev) << " " << deriv_prev << " - ";
+            //std::cout << std::signbit(deriv_curr) << " " << deriv_curr << std::endl;
+          }
+
+          double pos_y = (int)(deriv_curr*-598.0f/max)+300;
+          contour_deriv.push_back( cv::Point(cut_off_factor*i, pos_y ));
+        }
       }
 
-      const cv::Point *pts = (const cv::Point*) cv::Mat(contour).data;
-      int npts = cv::Mat(contour).rows;
-
-      // Draw max peak line
-      if (v>17) {
+      // Draw max peak line with frequency
+      /*if (v>17) {
         cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(255,255,255),2);
         cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+      }*/
+
+      std::cout << "---------------" << std::endl;
+      int i_min = 0;
+      int fundamental=0;
+      for (int i=0; i<maximums.size(); i++) {
+        if (maximums.at(i) < maximums.at(i_min)) {
+          i_min = i;
+          fundamental = (maximums[i_min]*frequency)/buffer_size;
+        }
+      }
+      if (maximums.size() > 0)
+      std::cout << i_min << " " << maximums.at(i_min) << std::endl;
+
+      cv::putText(image, std::to_string(fundamental)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+
+
+      /*if (maximums.size() > 1) {
+        double fundamental = 0.0;
+        for (int i=1; i<maximums.size(); i++) {
+
+          double diff = maximums.at(i)-maximums.at(i-1);
+          std::cout << diff << std::endl;
+          fundamental += diff;
+        }
+        fundamental /= maximums.size();
+        fundamental = (fundamental*frequency)/buffer_size;
+        cv::putText(image, std::to_string(fundamental)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+      }*/
+
+      for (auto i : maximums) {
+        cv::line(image, cv::Point(cut_off_factor*i,0), cv::Point(cut_off_factor*i,600), cv::Scalar(255,200,200),2);
       }
 
       // Draw spectrum
+      const cv::Point *pts = (const cv::Point*) cv::Mat(contour).data;
+      int npts = cv::Mat(contour).rows;
       cv::polylines(image, &pts, &npts, 1,
                   false,             // Draw closed contour (i.e. joint end to start)
                   cv::Scalar(255,100,50), // Colour RGB ordering (here = green)
                   2,                 // Line thickness
                   0, 0);
 
-      // Put text
+      // Draw derivation
+      const cv::Point *pts_deriv = (const cv::Point*) cv::Mat(contour_deriv).data;
+      int npts_deriv = cv::Mat(contour_deriv).rows;
+      cv::polylines(image, &pts_deriv, &npts_deriv, 1,
+                  false,             // Draw closed contour (i.e. joint end to start)
+                  cv::Scalar(50,100,250), // Colour RGB ordering (here = green)
+                  2,                 // Line thickness
+                  0, 0);
 
       cv::imshow("Spectrum", image);
-      cv::waitKey(5);
+      cv::waitKey(0);
     }
   }
 
