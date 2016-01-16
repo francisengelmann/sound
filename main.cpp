@@ -273,7 +273,7 @@ int main(int argc, char ** argv) {
       // Draw max peak line with frequency
       /*if (v>17) {
         cv::line(image, cv::Point(cut_off_factor*max_freq,0), cv::Point(cut_off_factor*max_freq,600), cv::Scalar(255,255,255),2);
-        cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+        cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+" Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
       }*/
 
       std::cout << "---------------" << std::endl;
@@ -288,7 +288,7 @@ int main(int argc, char ** argv) {
       if (maximums.size() > 0)
       std::cout << i_min << " " << maximums.at(i_min) << std::endl;
 
-      cv::putText(image, std::to_string(fundamental)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+      cv::putText(image, std::to_string(fundamental)+" Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
 
 
       /*if (maximums.size() > 1) {
@@ -301,7 +301,7 @@ int main(int argc, char ** argv) {
         }
         fundamental /= maximums.size();
         fundamental = (fundamental*frequency)/buffer_size;
-        cv::putText(image, std::to_string(fundamental)+" MHz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+        cv::putText(image, std::to_string(fundamental)+" Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
       }*/
 
       for (auto i : maximums) {

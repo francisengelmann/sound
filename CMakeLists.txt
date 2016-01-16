@@ -17,4 +17,3 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
 add_executable(sound main.cpp)
 target_link_libraries(sound ${OPENAL_LIBRARY} ${OpenCV_LIBS} ${FFTW_LIBS})
-
