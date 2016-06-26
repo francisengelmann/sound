@@ -140,7 +140,7 @@ int main(int argc, char ** argv) {
   // Open listening device
   ALCuint frequency = 44100/4;
   ALCenum format = AL_FORMAT_MONO16;
-  ALCsizei buffer_size = 1024; // Anzahl der Sampleframes
+  ALCsizei buffer_size = 800; // Anzahl der Sampleframes
   ALCchar* deviceName = NULL;
   ALCdevice *device = alcCaptureOpenDevice(deviceName, frequency, format, buffer_size);
   if (alGetError() != AL_NO_ERROR) return 0;
@@ -231,7 +231,7 @@ int main(int argc, char ** argv) {
       double cut_off_factor = 4;
 
       // Plot points
-      cv::Mat image(600,nsamples, CV_8UC3, cv::Scalar(20,30,40));
+      cv::Mat image(nsamples*3.0/4.0,nsamples, CV_8UC3, cv::Scalar(20,30,40));
 
       for (int i=0; i<buffer_size; i+=40) cv::line(image, cv::Point(i,0), cv::Point(i,600), cv::Scalar(100, 100, 100), 1);
       for (int i=0; i<600; i+=40) cv::line(image, cv::Point(0,i), cv::Point(buffer_size,i), cv::Scalar(100, 100, 100), 1);
@@ -275,7 +275,7 @@ int main(int argc, char ** argv) {
         cv::putText(image, std::to_string((max_freq*frequency)/buffer_size)+"Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
       }*/
 
-      std::cout << "---------------" << std::endl;
+      //std::cout << "---------------" << std::endl;
       int i_min = 0;
       int fundamental=0;
       for (int i=0; i<maximums.size(); i++) {
@@ -285,9 +285,9 @@ int main(int argc, char ** argv) {
         }
       }
       if (maximums.size() > 0)
-      std::cout << i_min << " " << maximums.at(i_min) << std::endl;
+      //std::cout << i_min << " " << maximums.at(i_min) << std::endl;
 
-      cv::putText(image, std::to_string(fundamental)+"Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
+      //cv::putText(image, std::to_string(fundamental)+"Hz", cv::Point(50,50), 1, 2, cv::Scalar(255,255,255),1);
 
       /*if (maximums.size() > 1) {
         double fundamental = 0.0;
