@@ -15,7 +15,7 @@ You need the following libraries:
 - FFTW to apply fourrier transformations
 
 ### Installation
-Set the correct pathes for the dependencies, then perform this:
+Set up the correct pathes for the dependencies, then type this into your console:
 ```
 mkdir build; cd build;
 cmake ..; build -j;
