@@ -13,3 +13,10 @@ You need the following libraries:
 - OpenCV to visualize the sound input and spectrum
 - OpenAL to access the sound card
 - FFTW to apply fourrier transformations
+
+### Installation
+Set the correct pathes for the dependencies, then perform this:
+```
+mkdir build; cd build;
+cmake ..; build -j;
+```
