@@ -7,6 +7,7 @@ Additionally, it shows the spectrum of the incoming signal and displays the freq
 
 ![alt tag](data/screen1.png)
 ![alt tag](data/screen2.png)
+Spectrum resulting from playing a guitar string, you can clearly see the the harmonics of the base tone!
 
 ### Dependencies
 You need the following libraries:
