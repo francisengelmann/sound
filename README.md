@@ -21,3 +21,7 @@ Set up the correct pathes for the dependencies, then type this into your console
 mkdir build; cd build;
 cmake ..; build -j;
 ```
+
+#### References
+[1] Daniel Shawcross Wilkerson. Harmony Explained: Progress Towards a Scientific Theory of Music
+https://arxiv.org/html/1202.4212v1
